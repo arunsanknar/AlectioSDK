@@ -2,8 +2,6 @@ from flask import jsonify
 from flask import Flask, Response
 from flask import request
 from flask import send_file
-
-# from waitress import serve
 import numpy as np
 import json
 import requests
@@ -43,12 +41,12 @@ class Pipeline(object):
     """
 
     def __init__(self, name, train_fn, test_fn, infer_fn, getstate_fn, args):
-        """
+        
         sentry_sdk.init(
             dsn="https://4eedcc29fa7844828397dca4afc2db32@o409542.ingest.sentry.io/5282336",
             integrations=[FlaskIntegration()]
         )
-        """
+        
         self.app = Flask(name)
         self.gunicorn_logger = logging.getLogger("gunicorn.error")
         self.app.logger.handlers = self.gunicorn_logger.handlers
@@ -63,7 +61,6 @@ class Pipeline(object):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         with open(os.path.join(dir_path, "config.json"), "r") as f:
             self.config = json.load(f)
-        # self._notifyserverstatus()
         if "onprem" in self.args and not self.args["onprem"]:
             self.demopayload = self._setdemovars(self.args["demoname"])
         else:
@@ -74,10 +71,6 @@ class Pipeline(object):
                 "bucket_name": "",
                 "type": "",
             }
-
-        #### Check if directories that will or will not be posted to Alectio team exists ( this posting of data is based on user acceptance to on or off prem)
-        # self._checkdirs(args["EXPT_DIR"])
-        # self._checkdirs(args["LOG_DIR"])
 
         # one loop
         self.app.add_url_rule("/one_loop", "one_loop", self.one_loop, methods=["POST"])
@@ -259,6 +252,13 @@ class Pipeline(object):
                     demometaobject_key,
                     "json",
                 )
+            
+            self.client.multi_part_upload_with_s3(
+                    self.state_json,
+                    self.payload["bucket_name"],
+                    object_key,
+                    "pickle",
+                )
             self.app.logger.info("Reference creation complete")
         else:
 
@@ -266,7 +266,7 @@ class Pipeline(object):
             if not os.path.isfile(
                 os.path.join(self.args["EXPT_DIR"], f"ckpt_{self.cur_loop-1}.pth")
             ):
-                # need to download the checkpoint files from S3
+                #Need to download the previous loops' checkpoint files from S3
                 self.app.logger.info(
                     "Starting to copy checkpoints for cloned experiment..."
                 )
@@ -399,6 +399,13 @@ class Pipeline(object):
                 "pickle",
             )
 
+        self.client.multi_part_upload_with_s3(
+                predictions,
+                self.payload["bucket_name"],
+                object_key,
+                "pickle",
+            )
+
         if self.cur_loop == 0:
             # write ground truth to S3
             object_key = os.path.join(
@@ -415,6 +422,13 @@ class Pipeline(object):
                     ground_truth,
                     self.demopayload["bucket_name"],
                     demogtsobject_key,
+                    "pickle",
+                )
+
+            self.client.multi_part_upload_with_s3(
+                    ground_truth,
+                    self.payload["bucket_name"],
+                    object_key,
                     "pickle",
                 )
 
@@ -494,6 +508,13 @@ class Pipeline(object):
                 demometricsobject_key,
                 "pickle",
             )
+
+        self.client.multi_part_upload_with_s3(
+                metrics,
+                self.payload["bucket_name"],
+                object_key,
+                "pickle",
+            )
         return
 
     def infer(self, args):
@@ -551,6 +572,10 @@ class Pipeline(object):
             """
             self.client.multi_part_upload_file(
                 localfile, self.demopayload["bucket_name"], demoinferobject_key
+            )
+
+        self.client.multi_part_upload_file(
+                localfile, self.payload["bucket_name"], key
             )
         return
 
