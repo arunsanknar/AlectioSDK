@@ -20,7 +20,6 @@ import torch.nn as nn
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
 def getdatasetstate(args={}):
     return {k: k for k in range(args["train_size"])}
 
@@ -146,6 +145,8 @@ def load_data(stage, args, indices=None):
         print("Length of the train set is", len(train))
         print("Length of the test set is", len(test))
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         train_aug = train
         if indices and (stage == "train" or stage == "infer"):
             train_aug = train.iloc[indices, :]
@@ -247,7 +248,7 @@ def train(args, labeled, resume_from, ckpt_file):
     criterion = criterion.to("cuda")
 
     if resume_from is not None:
-        ckpt = torch.load(os.path.join(args["EXPT_DIR"], resume_from + ".pth"))
+        ckpt = torch.load(os.path.join(args["EXPT_DIR"], resume_from))
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
     else:
@@ -293,7 +294,7 @@ def train(args, labeled, resume_from, ckpt_file):
     print("Finished Training. Saving the model as {}".format(ckpt_file))
 
     ckpt = {"model": model.state_dict(), "optimizer": optimizer.state_dict()}
-    torch.save(ckpt, os.path.join(args["EXPT_DIR"], ckpt_file + ".pth"))
+    torch.save(ckpt, os.path.join(args["EXPT_DIR"], ckpt_file))
 
     return
 
@@ -304,7 +305,7 @@ def test(args, ckpt_file):
     iterator, TEXT, LABEL, tabular_dataset = load_data(
         stage="test", args=args, indices=None
     )
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     INPUT_DIM = len(TEXT.vocab)
     OUTPUT_DIM = 1
     BIDIRECTIONAL = True
@@ -323,7 +324,7 @@ def test(args, ckpt_file):
     )
 
     model.load_state_dict(
-        torch.load(os.path.join(args["EXPT_DIR"], ckpt_file + ".pth"))["model"]
+        torch.load(os.path.join(args["EXPT_DIR"], ckpt_file))["model"]
     )
 
     model = model.to(device=device)
@@ -350,9 +351,6 @@ def test(args, ckpt_file):
                 prediction = model(text, text_length)
 
             for logit, label in zip(prediction, labels):
-                # print("logit",logit)
-                # print("label",label)
-                # print("logit.cpu()",logit.cpu())
                 predictions[predix] = torch.sigmoid(logit.cpu())
                 truelabels[predix] = label.cpu().numpy().tolist()
                 predix += 1
@@ -382,7 +380,7 @@ def infer(args, unlabeled, ckpt_file):
     iterator, TEXT, LABEL, tabular_dataset = load_data(
         stage="infer", args=args, indices=unlabeled
     )
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     INPUT_DIM = len(TEXT.vocab)
     OUTPUT_DIM = 1
     BIDIRECTIONAL = True
@@ -401,7 +399,7 @@ def infer(args, unlabeled, ckpt_file):
     )
 
     model.load_state_dict(
-        torch.load(os.path.join(args["EXPT_DIR"], ckpt_file + ".pth"))["model"]
+        torch.load(os.path.join(args["EXPT_DIR"], ckpt_file))["model"]
     )
 
     model = model.to(device=device)
@@ -434,35 +432,19 @@ def infer(args, unlabeled, ckpt_file):
                     prediction = 1
 
                 predictions[unlabeled[predix]]["prediction"] = prediction
-
-                predictions[unlabeled[predix]]["pre_softmax"] = [
+                pre_softmax = torch.tensor([
                     [logit_fn(sig_prediction.cpu()), logit_fn(1 - sig_prediction.cpu())]
-                ]
+                ])
+                pre_softmax = pre_softmax.squeeze(0)
 
-                # print(predictions[unlabeled[predix]]["pre_softmax"])
-
+                predictions[unlabeled[predix]]["pre_softmax"] = pre_softmax
                 predix += 1
 
             pbar.update()
-
-    print("The predictions are", predictions)
-
     return {"outputs": predictions}
 
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config",
-        default=os.path.join(os.getcwd(), "config.yaml"),
-        type=str,
-        help="Path to config.yaml",
-    )
-    args = parser.parse_args()
-
-    with open(args.config, "r") as stream:
-        args = yaml.safe_load(stream)
 
     labeled = list(range(1000))
     resume_from = None
@@ -470,8 +452,6 @@ if __name__ == "__main__":
 
     print("----- Training on the ", args["DATASET"], "dataset!")
 
-    print("Testing getdatasetstate")
-    getdatasetstate(args=args)
-    train(args=args, labeled=labeled, resume_from=resume_from, ckpt_file=ckpt_file)
-    test(args=args, ckpt_file=ckpt_file)
-    print(infer(args=args, unlabeled=[10, 20, 30], ckpt_file=ckpt_file))
+    train(labeled=labeled, resume_from=resume_from, ckpt_file=ckpt_file)
+    test(ckpt_file=ckpt_file)
+    infer(unlabeled=[10, 20, 30], ckpt_file=ckpt_file)
