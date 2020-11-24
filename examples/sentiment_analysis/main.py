@@ -3,11 +3,7 @@ import yaml, json
 from alectio_sdk.flask_wrapper import Pipeline
 from processes import train, test, infer, getdatasetstate
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--config", help="Path to config.yaml", required=True)
-args = parser.parse_args()
-
-with open(args.config, "r") as stream:
+with open("./config.yaml", "r") as stream:
     args = yaml.safe_load(stream)
 
 # put the train/test/infer processes into the constructor
@@ -18,6 +14,7 @@ app = Pipeline(
     infer_fn=infer,
     getstate_fn=getdatasetstate,
     args=args,
+    token="hPrjnEpRi0jLikGNNU8lIiCulCbdHAMJeIcBOc2XB4",
 )
 
 if __name__ == "__main__":

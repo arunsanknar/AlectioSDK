@@ -1,25 +1,23 @@
 sample_payload: 'sample_payload.json'
-OUTPUT_DIRECTORY : "./outputs/"
 DATA_DIR : "./data/"
-MODEL_DIRECTORY : "./models/"
-IMAGEDATA_DIR : "./data/"
-LABEL_DIRECTORY : "./data/"
-WEIGHTS_DIR : "./models"
+EXPT_DIR : "./log"
+MODEL_DIR : "./models"
+CKPT_EXT : '.tar.gz'
 exp_name: "Mnist"
+LABEL_DIRECTORY: "./data/"
 
 
 
 ### TRAIN FUNCTION ARGS ###
-train_epochs : 5
 NUM_INPUT : 784
 RAW_IMG_SIZE : (28, 28)
 IMG_SIZE : (28, 28)
 INPUT_SHAPE : (IMG_SIZE[0], IMG_SIZE[1])
 NUM_STEPS: 1000
-MAX_EPOCH : 2
-BATCH_SIZE: 128
+EPOCHS : 10
+BATCH_SIZE: 32
 FOLDS : [1]
-DISPLAY_STEP: 100
+DISPLAY_STEP: 1
 STOPPING_PATIENCE : 32
 LR_PATIENCE : 16
 INITIAL_LR : 0.1
