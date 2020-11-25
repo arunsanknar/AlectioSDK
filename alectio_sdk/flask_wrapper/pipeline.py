@@ -2,10 +2,7 @@ from flask import jsonify
 from flask import Flask, Response
 from flask import request
 from flask import send_file
-<<<<<<< HEAD
-=======
 
->>>>>>> upstream/develop
 import numpy as np
 import json
 import requests
@@ -35,28 +32,21 @@ class Pipeline(object):
     r"""
     A wrapper for your `train`, `test`, and `infer` function. The arguments for your functions should be specifed
     separately and passed to your pipeline object during creation.
-
     Args:
         name (str): experiment name
         train_fn (function): function to be executed in the train cycle of the experiment.
         test_fn (function): function to be executed in the test cycle of the experiment.
         infer_fn (function): function to be executed in the inference cycle of the experiment.
         getstate_fn (function): function specifying a mapping between indices and file names.
-
     """
 
-<<<<<<< HEAD
-    def __init__(self, name, train_fn, test_fn, infer_fn, getstate_fn, args):
-        
-=======
     def __init__(self, name, train_fn, test_fn, infer_fn, getstate_fn, args, token):
         """
->>>>>>> upstream/develop
         sentry_sdk.init(
             dsn="https://4eedcc29fa7844828397dca4afc2db32@o409542.ingest.sentry.io/5282336",
             integrations=[FlaskIntegration()]
         )
-        
+        """
         self.app = Flask(name)
         self.gunicorn_logger = logging.getLogger("gunicorn.error")
         self.app.logger.handlers = self.gunicorn_logger.handlers
@@ -74,12 +64,9 @@ class Pipeline(object):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         with open(os.path.join(dir_path, "config.json"), "r") as f:
             self.config = json.load(f)
-<<<<<<< HEAD
-=======
 
         self.client_token = token
         # self._notifyserverstatus()
->>>>>>> upstream/develop
         if "onprem" in self.args and not self.args["onprem"]:
             self.demo_payload = self._setdemovars(self.args["demoname"])
         else:
@@ -90,6 +77,10 @@ class Pipeline(object):
                 "bucket_name": "",
                 "type": "",
             }
+
+        #### Check if directories that will or will not be posted to Alectio team exists ( this posting of data is based on user acceptance to on or off prem)
+        # self._checkdirs(args["EXPT_DIR"])
+        # self._checkdirs(args["LOG_DIR"])
 
         # one loop
         self.app.add_url_rule("/one_loop", "one_loop", self.one_loop, methods=["POST"])
@@ -127,7 +118,6 @@ class Pipeline(object):
     def _estimate_exp_time(self, last_time):
         """
         Estimates the compute time remaining for the experiment
-
         Args:
             train_times (list): training_times noted down so far
             n_loop (int): total number of loops
@@ -195,16 +185,13 @@ class Pipeline(object):
     def _one_loop(self, payload, args):
         r"""
         Executes one loop of active learning. Returns the read `payload` back to the user.
-
         Args:
            args: a dict with the key `sample_payload` (required path) and any arguments needed by the `train`, `test`
            and infer functions.
         Example::
-
             args = {sample_payload: 'sample_payload.json', EXPT_DIR : "./log", exp_name: "test", \
                                                                  train_epochs: 1, batch_size: 8}
             app._one_loop(args)
-
         """
 
         # payload = json.load(open(args["sample_payload"]))
@@ -298,13 +285,6 @@ class Pipeline(object):
                     demo_meta_object_key,
                     "json",
                 )
-            
-            self.client.multi_part_upload_with_s3(
-                    self.state_json,
-                    self.payload["bucket_name"],
-                    object_key,
-                    "pickle",
-                )
             self.app.logger.info("Reference creation complete")
         else:
 
@@ -312,7 +292,7 @@ class Pipeline(object):
             if not os.path.isfile(
                 os.path.join(self.args["EXPT_DIR"], f"ckpt_{self.cur_loop-1}" + self.ckpt_ext)
             ):
-                #Need to download the previous loops' checkpoint files from S3
+                # need to download the checkpoint files from S3
                 self.app.logger.info(
                     "Starting to copy checkpoints for cloned experiment..."
                 )
@@ -356,10 +336,8 @@ class Pipeline(object):
     def train(self, args):
         r"""
         A wrapper for your `train` function. Returns `None`.
-
         Args:
            args: a dict whose keys include all of the arguments needed for your `train` function which is defined in `processes.py`.
-
         """
         start = time.time()
 
@@ -430,10 +408,8 @@ class Pipeline(object):
     def test(self, args):
         r"""
         A wrapper for your `test` function which writes predictions and ground truth to the specified S3 bucket. Returns `None`.
-
         Args:
            args: a dict whose keys include all of the arguments needed for your `test` function which is defined in `processes.py`.
-
         """
         self.app.logger.info("Extracting test results ")
         res = self.test_fn(args, ckpt_file=self.ckpt_file)
@@ -460,13 +436,6 @@ class Pipeline(object):
                 "pickle",
             )
 
-        self.client.multi_part_upload_with_s3(
-                predictions,
-                self.payload["bucket_name"],
-                object_key,
-                "pickle",
-            )
-
         if self.cur_loop == 0:
             # write ground truth to S3
             object_key = os.path.join(
@@ -483,13 +452,6 @@ class Pipeline(object):
                     ground_truth,
                     self.demo_payload["bucket_name"],
                     demo_gt_object_key,
-                    "pickle",
-                )
-
-            self.client.multi_part_upload_with_s3(
-                    ground_truth,
-                    self.payload["bucket_name"],
-                    object_key,
                     "pickle",
                 )
 
@@ -574,22 +536,13 @@ class Pipeline(object):
                 demometricsobject_key,
                 "pickle",
             )
-
-        self.client.multi_part_upload_with_s3(
-                metrics,
-                self.payload["bucket_name"],
-                object_key,
-                "pickle",
-            )
         return
 
     def infer(self, args):
         r"""
         A wrapper for your `infer` function which writes outputs to the specified S3 bucket. Returns `None`.
-
         Args:
            args: a dict whose keys include all of the arguments needed for your `infer` function which is defined in `processes.py`.
-
         """
         self.app.logger.info(
             "Getting insights on currently unused/unlabelled train data"
@@ -643,21 +596,15 @@ class Pipeline(object):
             self.client.multi_part_upload_file(
                 localfile, self.demo_payload["bucket_name"], demoinferobject_key
             )
-
-        self.client.multi_part_upload_file(
-                localfile, self.payload["bucket_name"], key
-            )
         return
 
     def __call__(self, debug=False, host="0.0.0.0", port=5000):
         r"""
         A wrapper for your `test` function which writes predictions and ground truth to the specified S3 bucket. Returns `None`.
-
         Args:
            debug (boolean, Default=False): If set to true, then the app runs in debug mode. See https://flask.palletsprojects.com/en/1.1.x/api/#flask.Flask.debug.
            host (str, Default='0.0.0.0'): the hostname to be listened to.
            port(int, Default:5000): the port of the webserver.
-
         """
         # serve(self.app, host="0.0.0.0", port=5000)
         # print("Server intialized successfully , Intialize your training loop by triggering Train process from Alectio website")
